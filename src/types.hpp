@@ -1,8 +1,9 @@
 #pragma once
 #include <cstdint>
 
-struct TickData {
-  uint64_t timestamp;
+struct alignas(64) TickData {
+  uint64_t exchange_timestamp;
+  uint64_t arrival_timestamp;
 
   double open;
   double high;
