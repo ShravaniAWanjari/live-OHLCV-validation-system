@@ -39,6 +39,6 @@ private:
   size_t size_;
   std::vector<T> buffer_;
 
-  std::atomic<size_t> head_;
-  std::atomic<size_t> tail_;
+  alignas(64) std::atomic<size_t> head_;
+  alignas(64) std::atomic<size_t> tail_;
 };
