@@ -6,7 +6,8 @@
 3. **Killed False Sharing:** Added `alignas(64)` to the head and tail indices of the ring buffer. This keeps them on separate CPU cache lines so the threads don't block each other.
 4. **Cleaned the Hot Path:** Removed slow printing (`std::cout`) from the hot path, saving the latencies in a pre-allocated vector to print after the loops finish.
 5. **CPU micro-napping:** Put `_mm_pause()` in the empty-loop check so the CPU doesn't choke when waiting for ticks.
+6. **Live Integration:** Integrated `IXWebSocket` to establish a live connection directly to the Binance 1s candle stream (`wss://stream.binance.com:9443/ws/btcusdt@kline_1s`).
 
-### The Results:
-* **Cold start:** 49.5 microseconds.
-* **Warm runs:** ~7.4 microseconds average handoff time.
+### The Results (Live Binance Feed):
+* **Cold start (Tick 1):** 34.0 microseconds.
+* **Warm runs (Ticks 2-10):** Blistering **7.4 to 12.7 microseconds** pipeline handoff latency.
