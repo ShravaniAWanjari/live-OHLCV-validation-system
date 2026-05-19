@@ -1,6 +1,7 @@
 #include "ingestor.hpp"
 #include "ring_buffer.hpp"
 #include "types.hpp"
+#include "validator.hpp"
 #include <chrono>
 #include <immintrin.h>
 #include <iostream>
@@ -15,6 +16,7 @@ int main() {
 
   RingBuffer<TickData> rb(1024);
   Ingestor ingestor;
+  Validator validator;
 
   ix::WebSocket webSocket;
   std::string url = "wss://stream.binance.com:9443/ws/btcusdt@kline_1s";
@@ -68,9 +70,18 @@ int main() {
         latencies.push_back(process_time - tick.arrival_timestamp);
         count++;
 
+        uint8_t validation_err = validator.validate(tick);
+
         std::cout << "[Consumer] Processed live tick " << count << "/"
                   << target_ticks << " | Close: " << tick.close
-                  << " | Vol: " << tick.volume << std::endl;
+                  << " | Vol: " << tick.volume;
+
+        if (validation_err != VALID) {
+          std::cout << " | [VALIDATION FAILED : Flags " << (int)validation_err
+                    << "]";
+        }
+        std::cout << std::endl;
+
       } else {
         _mm_pause();
       }
@@ -90,5 +101,7 @@ int main() {
   ix::uninitNetSystem();
 
   std::cout << "Live pipeline test completed successfully!" << std::endl;
+  std::cout << "Final Stats - Total: " << validator.get_total_ticks()
+            << " | Failures: " << validator.get_failure_count() << std::endl;
   return 0;
 }
