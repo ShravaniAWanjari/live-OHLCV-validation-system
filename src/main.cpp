@@ -2,6 +2,7 @@
 #include "ring_buffer.hpp"
 #include "types.hpp"
 #include "validator.hpp"
+#include "risk_manager.hpp"
 #include <chrono>
 #include <immintrin.h>
 #include <iostream>
@@ -9,6 +10,56 @@
 #include <ixwebsocket/IXWebSocket.h>
 #include <thread>
 #include <vector>
+void run_edge_case_tests(){
+  std::cout << "\n=============================================" << std::endl;
+  std::cout << "RUNNING PIPELINE EDGE CASE TESTS..." << std::endl;
+  std::cout << "=============================================" << std::endl;
+}
+
+Validator test_validator;
+RiskManager test_risk_manager(3);
+
+TickData base_tick;
+base_tick.exchange_timestamp = 1000;
+base_tick.open = 100.0;
+base_tick.high = 105.0;
+base_tick.low = 95.0;
+base_tick.close = 102.0;
+base_tick.volume = 10.0;
+
+//Test 1
+std::cout << "\n[Test 1] Injecting clean tick..." << std::endl;
+uint8_t err1 = test_validator.validate(base_tick);
+test_risk_manager.handle_validation_result(err1, "Test 1 Context");
+std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << std::endl;
+
+
+// Test 2
+
+std::cout << "\n[Test 2] Injecting crossed OHLC tick (High: 90, Low: 95)..." << std::endl;
+TickData bad_ohlc = base_tick;
+bad_ohlc.exchange_timestamp = 1001;
+bad_ohlc.high = 90.0;
+bad_ohlc.low = 95.0;
+
+uint8_t err2 = test_validator.validate(bad_ohlc);
+test_risk_manager.handle_validation_result(err2, "Test 2 Context");
+std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << " (Expected: false)" << std::endl;
+
+test_validator.reset();
+test_risk_manager.reset();
+
+//Test 3
+
+std::cout << "\n[Test 3] Injecting chronologically stale tick..." << std::endl;
+
+
+
+
+
+
+
+
 
 int main() {
 
