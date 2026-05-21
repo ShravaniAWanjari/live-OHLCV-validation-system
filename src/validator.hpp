@@ -19,7 +19,7 @@ enum ValidationFlags : uint8_t {
 
 class Validator {
 public:
-  Validator() : last_timestamp_(0), total_ticks_(0), failure_count_(0) {}
+  Validator() : last_timestamp_(0), last_close_(0.0), total_ticks_(0), failure_count_(0) {}
 
   uint8_t validate(const TickData &tick) {
     uint8_t result = VALID;
@@ -80,6 +80,8 @@ public:
 
 private:
   uint64_t last_timestamp_;
+  double last_close_;      
   uint64_t total_ticks_;
   uint64_t failure_count_;
 };
+

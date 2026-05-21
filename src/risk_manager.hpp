@@ -1,4 +1,5 @@
 #pragma once
+#include "validator.hpp"
 #include <iostream>
 #include <string>
 #include <atomic>
@@ -6,7 +7,7 @@
 enum class PipelineState{
     ACTIVE,
     HALTED
-}
+};
 
 class RiskManager {
 public:
@@ -16,7 +17,7 @@ public:
           max_non_critical_errors_(max_non_critical_errors){}
     
     bool is_active() const{
-        return state_.load(std::memory_order_acquired) == PipelineState::ACTIVE;
+        return state_.load(std::memory_order_acquire) == PipelineState::ACTIVE;
     }
 
     void handle_validation_result(uint8_t validation_flags, const std::string& context = ""){
@@ -43,13 +44,20 @@ public:
     }
 
     void reset(){
-        state_.store(PipelineState::HALTED, std::memory_order_release);
+        state_.store(PipelineState::ACTIVE, std::memory_order_release);
+        non_critical_error_count_ = 0;
+    }
 
-    std::cerr << "\n################################################################" << std::endl;
-    std::cerr << "!!! RISK MANAGER CRITICAL ALERT : SYSTEM HALTING !!!" << std::endl;
-    std::cerr << "ACTION: PULLING ALL ACTIVE ORDERS FROM EXCHANGE IMMEDIATELY!" << std::endl;
-    std::cerr << "STATUS: DOWNSTREAM TRADING STRATGY DISCONNECTED." << std::endl;
-    std::cerr << "################################################################\n" << std::endl;
+private:
+    void trigger_halt(const std::string& reason){
+        state_.store(PipelineState::HALTED, std::memory_order_release);
+        
+        std::cerr << "\n################################################################" << std::endl;
+        std::cerr << "!!! RISK MANAGER CRITICAL ALERT : SYSTEM HALTING !!!" << std::endl;
+        std::cerr << "Reason: " << reason << std::endl;
+        std::cerr << "ACTION: PULLING ALL ACTIVE ORDERS FROM EXCHANGE IMMEDIATELY!" << std::endl;
+        std::cerr << "STATUS: DOWNSTREAM TRADING STRATEGY DISCONNECTED." << std::endl;
+        std::cerr << "################################################################\n" << std::endl;
     }
 
     std::atomic<PipelineState> state_;
