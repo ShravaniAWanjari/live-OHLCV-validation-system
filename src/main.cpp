@@ -10,6 +10,17 @@
 #include <ixwebsocket/IXWebSocket.h>
 #include <thread>
 #include <vector>
+#include <fstream>
+
+struct MetricRecord {
+  uint64_t exchange_timestamp;
+  uint64_t arrival_timestamp;
+  uint64_t processed_timestamp;
+  uint64_t latency_ns;
+  double close;
+  double volume;
+  uint8_t validation_flags;
+};
 
 void run_edge_case_tests(){
   std::cout << "\n=============================================" << std::endl;
@@ -114,7 +125,9 @@ int main() {
   tlsOptions.disable_hostname_validation = true;
   webSocket.setTLSOptions(tlsOptions);
 
-  const int target_ticks = 10;
+  const int target_ticks = 100;
+    std::vector<MetricRecord> metrics;
+    metrics.reserve(target_ticks + 10);
 
   webSocket.setOnMessageCallback([&](const ix::WebSocketMessagePtr &msg) {
     if (msg->type == ix::WebSocketMessageType::Message) {
@@ -159,6 +172,17 @@ int main() {
                 .count();
 
         uint8_t validation_err = validator.validate(tick);
+
+        metrics.push_back({
+          tick.exchange_timestamp,
+          tick.arrival_timestamp,
+          process_time,
+          process_time - tick.arrival_timestamp,
+          tick.close,
+          tick.volume,
+          validation_err
+        });
+
         risk_manager.handle_validation_result(validation_err, "Live Binance Stream");
         if (!risk_manager.is_active()){
           std::cerr << "[Consumer] Risk Manager initiated Halt. Aborting Consumer." << std::endl;
@@ -191,6 +215,24 @@ int main() {
   std::cout << "\nStopping WebSocket..." << std::endl;
   webSocket.stop();
   ix::uninitNetSystem();
+
+  std::ofstream csv_file("metrics.csv");
+  if (csv_file.is_open()){
+    csv_file << "exchange_timestamp,arrival_timestamp,processed_timestamp,latency_ns,close,volume,validation_flags\n";
+    for (const auto& m : metrics){
+      csv_file << m.exchange_timestamp << ","
+               << m.arrival_timestamp << ","
+               << m.processed_timestamp << ","
+               << m.latency_ns << ","
+               << m.close << ","
+               << m.volume << ","
+               << static_cast<int>(m.validation_flags) << "\n";
+    }
+    csv_file.close();
+    std::cout << "Successfully exported metrics to metrics.csv" << std::endl;
+  } else {
+    std::cerr << "Error: Could not write metrics.csv" << std::endl;
+  }
 
   std::cout << "Live pipeline test completed successfully!" << std::endl;
   std::cout << "Final Stats - Total: " << validator.get_total_ticks()
