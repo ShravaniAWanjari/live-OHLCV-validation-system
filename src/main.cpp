@@ -3,6 +3,7 @@
 #include "types.hpp"
 #include "validator.hpp"
 #include "risk_manager.hpp"
+#include "logger.hpp"
 #include <chrono>
 #include <immintrin.h>
 #include <iostream>
@@ -126,8 +127,7 @@ int main() {
   webSocket.setTLSOptions(tlsOptions);
 
   const int target_ticks = 100;
-    std::vector<MetricRecord> metrics;
-    metrics.reserve(target_ticks + 10);
+  AsyncLogger<MetricRecord> logger("metrics.csv");
 
   webSocket.setOnMessageCallback([&](const ix::WebSocketMessagePtr &msg) {
     if (msg->type == ix::WebSocketMessageType::Message) {
@@ -151,6 +151,7 @@ int main() {
 
   std::cout << "Connecting to Binance Live WebSocket (BTCUSDT 1s stream)..."
             << std::endl;
+  logger.start();
   webSocket.start();
 
   std::thread consumer([&]() {
@@ -173,7 +174,7 @@ int main() {
 
         uint8_t validation_err = validator.validate(tick);
 
-        metrics.push_back({
+        logger.log({
           tick.exchange_timestamp,
           tick.arrival_timestamp,
           process_time,
@@ -212,27 +213,11 @@ int main() {
 
   consumer.join();
 
+  logger.stop();
+
   std::cout << "\nStopping WebSocket..." << std::endl;
   webSocket.stop();
   ix::uninitNetSystem();
-
-  std::ofstream csv_file("metrics.csv");
-  if (csv_file.is_open()){
-    csv_file << "exchange_timestamp,arrival_timestamp,processed_timestamp,latency_ns,close,volume,validation_flags\n";
-    for (const auto& m : metrics){
-      csv_file << m.exchange_timestamp << ","
-               << m.arrival_timestamp << ","
-               << m.processed_timestamp << ","
-               << m.latency_ns << ","
-               << m.close << ","
-               << m.volume << ","
-               << static_cast<int>(m.validation_flags) << "\n";
-    }
-    csv_file.close();
-    std::cout << "Successfully exported metrics to metrics.csv" << std::endl;
-  } else {
-    std::cerr << "Error: Could not write metrics.csv" << std::endl;
-  }
 
   std::cout << "Live pipeline test completed successfully!" << std::endl;
   std::cout << "Final Stats - Total: " << validator.get_total_ticks()

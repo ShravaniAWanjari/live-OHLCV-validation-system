@@ -10,7 +10,7 @@
     *   **Producer:** Acting like the exchange, shoving data into the buffer.
     *   **Consumer:** Acting like the brain, pulling data out and processing it.
 
-### Why this is cool:
+### Why this approach (dear reader feel free to comment on it since I am still getting a hang of this):
 The system is now "decoupled." The network thread can run at full speed without waiting for the logic thread to finish its math. This is how real HFT systems handle millions of messages without crashing.
 
 **Status:** Infrastructure works. Next we plug in real data.
