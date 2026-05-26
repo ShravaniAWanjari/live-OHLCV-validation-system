@@ -9,7 +9,7 @@ metrics$latency_us <- metrics$latency_ns / 1000
 
 total_ticks <- nrow(metrics)
 anomalies <- sum(metrics$validation_flags != 0)
-mean_lantecy <- mean(metrics$latency_us)
+mean_latency <- mean(metrics$latency_us)
 p95_latency <- quantile(metrics$latency_us, 0.95)
 p99_latency <- quantile(metrics$latency_us, 0.99)
 max_latency <- max(metrics$latency_us)
