@@ -1,17 +1,20 @@
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "ingestor.hpp"
+#include "logger.hpp"
 #include "ring_buffer.hpp"
+#include "risk_manager.hpp"
 #include "types.hpp"
 #include "validator.hpp"
-#include "risk_manager.hpp"
-#include "logger.hpp"
 #include <chrono>
+#include <fstream>
 #include <immintrin.h>
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
 #include <thread>
 #include <vector>
-#include <fstream>
 
 struct MetricRecord {
   uint64_t exchange_timestamp;
@@ -23,7 +26,7 @@ struct MetricRecord {
   uint8_t validation_flags;
 };
 
-void run_edge_case_tests(){
+void run_edge_case_tests() {
   std::cout << "\n=============================================" << std::endl;
   std::cout << "RUNNING PIPELINE EDGE CASE TESTS..." << std::endl;
   std::cout << "=============================================" << std::endl;
@@ -42,10 +45,12 @@ void run_edge_case_tests(){
   std::cout << "\n[Test 1] Injecting clean tick..." << std::endl;
   uint8_t err1 = test_validator.validate(base_tick);
   test_risk_manager.handle_validation_result(err1, "Test 1 Context");
-  std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << std::endl;
+  std::cout << "System Active: " << std::boolalpha
+            << test_risk_manager.is_active() << std::endl;
 
   // Test 2
-  std::cout << "\n[Test 2] Injecting crossed OHLC tick (High: 90, Low: 95)..." << std::endl;
+  std::cout << "\n[Test 2] Injecting crossed OHLC tick (High: 90, Low: 95)..."
+            << std::endl;
   TickData bad_ohlc = base_tick;
   bad_ohlc.exchange_timestamp = 1001;
   bad_ohlc.high = 90.0;
@@ -53,13 +58,16 @@ void run_edge_case_tests(){
 
   uint8_t err2 = test_validator.validate(bad_ohlc);
   test_risk_manager.handle_validation_result(err2, "Test 2 Context");
-  std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << " (Expected: false)" << std::endl;
+  std::cout << "System Active: " << std::boolalpha
+            << test_risk_manager.is_active() << " (Expected: false)"
+            << std::endl;
 
   test_validator.reset();
   test_risk_manager.reset();
 
   // Test 3
-  std::cout << "\n[Test 3] Injecting chronologically stale tick..." << std::endl;
+  std::cout << "\n[Test 3] Injecting chronologically stale tick..."
+            << std::endl;
   TickData tick_t1 = base_tick;
   tick_t1.exchange_timestamp = 2000;
   test_validator.validate(tick_t1);
@@ -68,7 +76,9 @@ void run_edge_case_tests(){
   tick_t2.exchange_timestamp = 1999;
   uint8_t err3 = test_validator.validate(tick_t2);
   test_risk_manager.handle_validation_result(err3, "Test 3 Context");
-  std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << " (Expected: false)" << std::endl;
+  std::cout << "System Active: " << std::boolalpha
+            << test_risk_manager.is_active() << " (Expected: false)"
+            << std::endl;
 
   test_validator.reset();
   test_risk_manager.reset();
@@ -85,26 +95,30 @@ void run_edge_case_tests(){
   tick_p2.close = 150.0;
   uint8_t err4 = test_validator.validate(tick_p2);
   test_risk_manager.handle_validation_result(err4, "Test 4 context");
-  std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << " (Expected: false)" << std::endl;
+  std::cout << "System Active: " << std::boolalpha
+            << test_risk_manager.is_active() << " (Expected: false)"
+            << std::endl;
 
   test_validator.reset();
   test_risk_manager.reset();
 
   // Test 5: Negative Volume Accumulation (Non-critical)
-  std::cout << "\n[Test 5] Injecting negative volume ticks (non-critical limit = 3)..." << std::endl;
+  std::cout << "\n[Test 5] Injecting negative volume ticks (non-critical limit "
+               "= 3)..."
+            << std::endl;
   TickData tick_v = base_tick;
   tick_v.volume = -1.0;
 
-  for (int i = 1; i <= 4; ++i){
+  for (int i = 1; i <= 4; ++i) {
     tick_v.exchange_timestamp = 4000 + i;
     std::cout << "Injecting anomaly #" << i << std::endl;
     uint8_t err_v = test_validator.validate(tick_v);
     test_risk_manager.handle_validation_result(err_v, "Test 5 Context");
-    std::cout << "System Active: " << std::boolalpha << test_risk_manager.is_active() << std::endl;
+    std::cout << "System Active: " << std::boolalpha
+              << test_risk_manager.is_active() << std::endl;
   }
   std::cout << "=============================================\n" << std::endl;
-} 
-
+}
 
 int main() {
 
@@ -130,6 +144,13 @@ int main() {
   AsyncLogger<MetricRecord> logger("metrics.csv");
 
   webSocket.setOnMessageCallback([&](const ix::WebSocketMessagePtr &msg) {
+#ifdef _WIN32
+    static thread_local bool is_pinned = false;
+    if (!is_pinned) {
+      SetThreadAffinityMask(GetCurrentThread(), 1ULL << 4);
+      is_pinned = true;
+    }
+#endif
     if (msg->type == ix::WebSocketMessageType::Message) {
       TickData tick;
 
@@ -155,6 +176,9 @@ int main() {
   webSocket.start();
 
   std::thread consumer([&]() {
+#ifdef _WIN32
+    SetThreadAffinityMask(GetCurrentThread(), 1ULL << 2);
+#endif
     int count = 0;
     std::vector<uint64_t> latencies;
     latencies.reserve(target_ticks);
@@ -163,7 +187,9 @@ int main() {
       TickData tick;
       if (rb.pop(tick)) {
         if (!risk_manager.is_active()) {
-          std::cerr << "[Consumer] Downstream pipeline is Halted. Dropping incoming feeds." << std::endl;
+          std::cerr << "[Consumer] Downstream pipeline is Halted. Dropping "
+                       "incoming feeds."
+                    << std::endl;
           break;
         }
         auto now = std::chrono::high_resolution_clock::now();
@@ -174,31 +200,25 @@ int main() {
 
         uint8_t validation_err = validator.validate(tick);
 
-        logger.log({
-          tick.exchange_timestamp,
-          tick.arrival_timestamp,
-          process_time,
-          process_time - tick.arrival_timestamp,
-          tick.close,
-          tick.volume,
-          validation_err
-        });
+        logger.log({tick.exchange_timestamp, tick.arrival_timestamp,
+                    process_time, process_time - tick.arrival_timestamp,
+                    tick.close, tick.volume, validation_err});
 
-        risk_manager.handle_validation_result(validation_err, "Live Binance Stream");
-        if (!risk_manager.is_active()){
-          std::cerr << "[Consumer] Risk Manager initiated Halt. Aborting Consumer." << std::endl;
+        risk_manager.handle_validation_result(validation_err,
+                                              "Live Binance Stream");
+        if (!risk_manager.is_active()) {
+          std::cerr
+              << "[Consumer] Risk Manager initiated Halt. Aborting Consumer."
+              << std::endl;
           break;
         }
-        if (validation_err != VALID){
-          std::cout << "[Consumer] Anomalous tick dropped (Flags: " << (int)validation_err << ")" << std::endl;
+        if (validation_err != VALID) {
+          std::cout << "[Consumer] Anomalous tick dropped (Flags: "
+                    << (int)validation_err << ")" << std::endl;
           continue;
         }
         latencies.push_back(process_time - tick.arrival_timestamp);
         count++;
-        std::cout << "[Consumer] Processed live tick " << count << "/"
-                  << target_ticks << " | Close: " << tick.close
-                  << " | Vol: " << tick.volume << std::endl;
-
       } else {
         _mm_pause();
       }

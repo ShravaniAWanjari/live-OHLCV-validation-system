@@ -29,8 +29,8 @@ public:
     result |= (tick.high < tick.low) * HIGH_LESS_THAN_LOW;
     result |= (tick.high < tick.open) * HIGH_LESS_THAN_OPEN;
     result |= (tick.high < tick.close) * HIGH_LESS_THAN_CLOSE;
-    result |= (tick.low < tick.open) * LOW_GREATER_THAN_OPEN;
-    result |= (tick.low < tick.close) * LOW_GREATER_THAN_CLOSE;
+    result |= (tick.low > tick.open) * LOW_GREATER_THAN_OPEN;
+    result |= (tick.low > tick.close) * LOW_GREATER_THAN_CLOSE;
     result |= (tick.volume < 0.0) * NEGATIVE_VOLUME;
     result |= ((last_timestamp_ != 0) &
                (tick.exchange_timestamp <= last_timestamp_)) *
@@ -40,7 +40,7 @@ public:
                (std::abs(tick.close - last_close_) > 0.10 * last_close_)) *
               PRICE_SPIKE;
 
-    if (!result == VALID) {
+    if (result != VALID) {
       failure_count_++;
     } else {
       last_timestamp_ = tick.exchange_timestamp;
