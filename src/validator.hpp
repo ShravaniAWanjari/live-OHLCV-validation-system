@@ -1,9 +1,8 @@
 #pragma once
 #include "types.hpp"
-#include <cstdint>
 #include <cmath>
+#include <cstdint>
 #include <string>
-
 
 enum ValidationFlags : uint8_t {
   VALID = 0,
@@ -19,38 +18,29 @@ enum ValidationFlags : uint8_t {
 
 class Validator {
 public:
-  Validator() : last_timestamp_(0), last_close_(0.0), total_ticks_(0), failure_count_(0) {}
+  Validator()
+      : last_timestamp_(0), last_close_(0.0), total_ticks_(0),
+        failure_count_(0) {}
 
   uint8_t validate(const TickData &tick) {
     uint8_t result = VALID;
     total_ticks_++;
 
-    if (tick.high < tick.low)
-      result |= HIGH_LESS_THAN_LOW;
-    if (tick.high < tick.open)
-      result |= HIGH_LESS_THAN_OPEN;
-    if (tick.high < tick.close)
-      result |= HIGH_LESS_THAN_CLOSE;
-    if (tick.low > tick.open)
-      result |= LOW_GREATER_THAN_OPEN;
-    if (tick.low > tick.close)
-      result |= LOW_GREATER_THAN_CLOSE;
+    result |= (tick.high < tick.low) * HIGH_LESS_THAN_LOW;
+    result |= (tick.high < tick.open) * HIGH_LESS_THAN_OPEN;
+    result |= (tick.high < tick.close) * HIGH_LESS_THAN_CLOSE;
+    result |= (tick.low < tick.open) * LOW_GREATER_THAN_OPEN;
+    result |= (tick.low < tick.close) * LOW_GREATER_THAN_CLOSE;
+    result |= (tick.volume < 0.0) * NEGATIVE_VOLUME;
+    result |= ((last_timestamp_ != 0) &
+               (tick.exchange_timestamp <= last_timestamp_)) *
+              OUT_OF_ORDER_TIMESTAMP;
 
-    if (tick.volume < 0.0)
-      result |= NEGATIVE_VOLUME;
+    result |= ((last_close_ > 0.0) &
+               (std::abs(tick.close - last_close_) > 0.10 * last_close_)) *
+              PRICE_SPIKE;
 
-    if (last_timestamp_ != 0 && tick.exchange_timestamp <= last_timestamp_) {
-      result |= OUT_OF_ORDER_TIMESTAMP;
-    }
-
-    if (last_close_ > 0.0){
-      double percent_change = std::abs(tick.close - last_close_)/ last_close_;
-      if (percent_change > 0.10){
-        result |= PRICE_SPIKE;
-      }
-    }
-
-    if (result != VALID) {
+    if (!result == VALID) {
       failure_count_++;
     } else {
       last_timestamp_ = tick.exchange_timestamp;
@@ -60,7 +50,7 @@ public:
     return result;
   }
 
-  static bool is_critical(uint8_t flags){
+  static bool is_critical(uint8_t flags) {
     uint8_t critical_mask = HIGH_LESS_THAN_LOW | HIGH_LESS_THAN_OPEN |
                             HIGH_LESS_THAN_CLOSE | LOW_GREATER_THAN_OPEN |
                             LOW_GREATER_THAN_CLOSE | OUT_OF_ORDER_TIMESTAMP |
@@ -71,7 +61,7 @@ public:
   uint64_t get_total_ticks() const { return total_ticks_; }
   uint64_t get_failure_count() const { return failure_count_; }
 
-  void reset(){
+  void reset() {
     last_timestamp_ = 0;
     last_close_ = 0.0;
     total_ticks_ = 0;
@@ -80,8 +70,7 @@ public:
 
 private:
   uint64_t last_timestamp_;
-  double last_close_;      
+  double last_close_;
   uint64_t total_ticks_;
   uint64_t failure_count_;
 };
-
