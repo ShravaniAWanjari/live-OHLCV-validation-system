@@ -7,11 +7,6 @@
 #include <string>
 #include <thread>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 template <typename T> class AsyncLogger {
 public:
   AsyncLogger(const std::string &filename, size_t queue_size = 4096)
@@ -54,9 +49,7 @@ public:
 
 private:
   void log_loop() {
-#ifdef _WIN32
-    SetThreadAffinityMask(GetCurrentThread(), 1ULL << 6);
-#endif
+
     while (running_) {
       T record;
       if (queue_.pop(record)) {

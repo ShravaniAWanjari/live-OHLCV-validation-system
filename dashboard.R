@@ -25,8 +25,9 @@ cat(sprintf("99th Percentile (p99) : %.3f microseconds\n", p99_latency))
 cat(sprintf("Max Latency           : %.3f microseconds\n", max_latency))
 cat("==================================================\n")
 
-png("dashboard_plots.png", width=1200, height = 800, res = 120)
-par(mfrow = c(3,1), mar  = c(4,4.5,2,1))
+png("dashboard_plots.png", width=1200, height = 1300, res = 120)
+par(mfrow = c(5,1), mar  = c(4,4.5,2,1))
+
 
 plot(metrics$latency_us, type = "o", pch = 20, col = "#2b8cbe",
      xlab = "Tick Index", ylab = "Latency (microseconds)",
@@ -54,5 +55,20 @@ hist(metrics$latency_us, breaks = 30, col = "#bcbddc", border = "#756bb1",
      main = "Latency Distribution (Jitter Histogram)",
      cex.main = 1.1, font.main = 2)
 grid(ny = TRUE, nx = FALSE)
+
+# --- New Plot 4: Latency CDF ---
+# A step-curve proving exact percentile latencies
+plot(ecdf(metrics$latency_us), main="Latency Cumulative Distribution (CDF)",
+     xlab="Latency (microseconds)", ylab="Cumulative Probability",
+     col="#e6550d", lwd=2, frame.plot=TRUE)
+grid()
+
+# --- New Plot 5: Volume vs Latency Scatter ---
+# Checks if heavy volume spikes choke the CPU
+plot(metrics$volume, metrics$latency_us, main="Stress Correlation: Volume vs Latency",
+     xlab="Trade Volume", ylab="Latency (microseconds)",
+     pch=20, col="#756bb1", frame.plot=TRUE)
+grid()
+
 dev.off()
 cat("Dashboard generated and saved as 'dashboard_plots.png'\n")

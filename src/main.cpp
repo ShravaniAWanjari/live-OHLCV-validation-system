@@ -1,7 +1,4 @@
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
+
 #include "ingestor.hpp"
 #include "logger.hpp"
 #include "ring_buffer.hpp"
@@ -145,13 +142,6 @@ int main() {
   AsyncLogger<MetricRecord> logger("metrics.csv");
 
   webSocket.setOnMessageCallback([&](const ix::WebSocketMessagePtr &msg) {
-#ifdef _WIN32
-    static thread_local bool is_pinned = false;
-    if (!is_pinned) {
-      SetThreadAffinityMask(GetCurrentThread(), 1ULL << 4);
-      is_pinned = true;
-    }
-#endif
     if (msg->type == ix::WebSocketMessageType::Message) {
       TickData tick;
 
@@ -177,9 +167,6 @@ int main() {
   webSocket.start();
 
   std::thread consumer([&]() {
-#ifdef _WIN32
-    SetThreadAffinityMask(GetCurrentThread(), 1ULL << 2);
-#endif
     int count = 0;
     std::vector<uint64_t> latencies;
     latencies.reserve(target_ticks);
